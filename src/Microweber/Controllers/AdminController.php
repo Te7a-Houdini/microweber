@@ -2,17 +2,15 @@
 
 namespace Microweber\Controllers;
 
-use Microweber\View;
-use User;
-use Illuminate\Routing\Controller;
-use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\Input;
-use Illuminate\Support\Facades\App;
 use Auth;
+use User;
+use Microweber\View;
+use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Input;
+use Illuminate\Support\Facades\Config;
 
 class AdminController extends Controller
 {
-    /** @var \Microweber\Application */
     public $app;
 
     public function __construct($app = null)
@@ -28,13 +26,13 @@ class AdminController extends Controller
     {
         $is_installed = mw_is_installed();
 
-        if (!$is_installed) {
-
+        if (! $is_installed) {
             $installer = new InstallController();
 
             return $installer->index();
+        }
 
-        } elseif (defined('MW_VERSION')) {
+        if ($is_installed && defined('MW_VERSION')) {
             $config_version = Config::get('microweber.version');
             if ($config_version != MW_VERSION) {
                 $this->app->update->post_update(MW_VERSION);
@@ -43,22 +41,17 @@ class AdminController extends Controller
 
         $force_https = \Config::get('microweber.force_https');
 
-        if ($force_https and !is_cli()) {
-            if (!is_https()) {
+        if ($force_https and ! is_cli()) {
+            if (! is_https()) {
                 $https = str_ireplace('http://', 'https://', url_current());
                 return mw()->url_manager->redirect($https);
             }
         }
 
-
-
-        if (!defined('MW_BACKEND')) {
+        if (! defined('MW_BACKEND')) {
             define('MW_BACKEND', true);
         }
 
-
-
-        //create_mw_default_options();
         mw()->content_manager->define_constants();
 
         if (defined('TEMPLATE_DIR')) {
@@ -74,45 +67,31 @@ class AdminController extends Controller
 
         $hasNoAdmin = User::where('is_admin', 1)->limit(1)->count();
 
-        if (!$hasNoAdmin) {
+        if (! $hasNoAdmin) {
             $this->hasNoAdmin();
         }
-
-
-
-
-
 
         if (defined('MW_USER_IP')) {
             $allowed_ips = config('microweber.admin_allowed_ips');
             if ($allowed_ips) {
                 $allowed_ips = explode(',', $allowed_ips);
                 $allowed_ips = array_trim($allowed_ips);
-                if (!empty($allowed_ips)) {
+                if (! empty($allowed_ips)) {
                     $is_allowed = false;
                     foreach ($allowed_ips as $allowed_ip) {
                         $is = \Symfony\Component\HttpFoundation\IpUtils::checkIp(MW_USER_IP, $allowed_ip);
                         if ($is) {
                             $is_allowed = $is;
                         }
-                }
-                    if (!$is_allowed) {
+                    }
+                    if (! $is_allowed) {
                         return response('Unauthorized.', 401);
                     }
                 }
             }
         }
 
-
-
-
-
-
-
-
-        $hasNoAdmin = User::where('is_admin', 1)->limit(1)->count();
-
-        $view .= (!$hasNoAdmin ? 'create' : 'index').'.php';
+        $view .= (! $hasNoAdmin ? 'create' : 'index').'.php';
 
         $layout = new View($view);
         $layout = $layout->__toString();
@@ -128,19 +107,20 @@ class AdminController extends Controller
         $apijs_settings_loaded = mw()->template->get_apijs_settings_url();
 
         $default_css = '<link rel="stylesheet" href="'.mw_includes_url().'default.css?v='.MW_VERSION.'" type="text/css" />';
-      //  if (!stristr($layout, $apijs_loaded)) {
-            $rep = 0;
-            $default_css = $default_css."\r\n".'<script src="'.$apijs_settings_loaded.'"></script>'."\r\n";
-            $default_css = $default_css."\r\n".'<script src="'.$apijs_loaded.'"></script>'."\r\n";
-            $layout = str_ireplace('<head>', '<head>'.$default_css, $layout, $rep);
-       // }
+
+        $rep = 0;
+        $default_css = $default_css."\r\n".'<script src="'.$apijs_settings_loaded.'"></script>'."\r\n";
+        $default_css = $default_css."\r\n".'<script src="'.$apijs_loaded.'"></script>'."\r\n";
+        $layout = str_ireplace('<head>', '<head>'.$default_css, $layout, $rep);
 
         $favicon_image = get_option('favicon_image', 'website');
+
         if ($favicon_image) {
             mw()->template->admin_head('<link rel="shortcut icon" href="' . $favicon_image . '" />');
         }
 
         $template_headers_src = mw()->template->admin_head(true);
+
         if ($template_headers_src != false and $template_headers_src != '') {
             $layout = str_ireplace('</head>', $template_headers_src.'</head>', $layout, $one);
         }
@@ -150,8 +130,8 @@ class AdminController extends Controller
 
     private function hasNoAdmin()
     {
-        if (!$this->checkServiceConfig()) {
-           $this->registerMwClient();
+        if (! $this->checkServiceConfig()) {
+            $this->registerMwClient();
         }
         if (mw()->url_manager->param('mw_install_create_user')) {
             $this->execCreateAdmin();
@@ -161,9 +141,11 @@ class AdminController extends Controller
     private function checkServiceConfig()
     {
         $serviceConfig = Config::get('services.microweber');
-        if (!$serviceConfig) {
+
+        if (! $serviceConfig) {
             return false;
         }
+
         if (trim(implode('', $serviceConfig))) {
             return true;
         }
@@ -182,7 +164,6 @@ class AdminController extends Controller
         $domain = str_replace('/', '', $domain);
         try {
             $request = $client->createRequest('POST', "config/$domain");
-            //dd($request, $request);
             $request->setPostField('token', md5($key));
             $response = $client->send($request);
         } catch (\Exception $e) {
@@ -196,16 +177,13 @@ class AdminController extends Controller
             $body = (array) json_decode($body);
 
             Config::set('services.microweber', $body);
-            Config::save(array('microweber', 'services'));
+            Config::save(['microweber', 'services']);
 
             save_option([
                 'option_value' => 'y',
                 'option_key' => 'enable_user_microweber_registration',
                 'option_group' => 'users',
             ]);
-        } else {
-            // $reason = $response->getReasonPhrase();
-            // dd(__FILE__, $reason, $response->getStatusCode());
         }
     }
 
@@ -221,7 +199,7 @@ class AdminController extends Controller
             $adminUser->is_active = 1;
             $adminUser->save();
             Config::set('microweber.has_admin', 1);
-            Config::save(array('microweber'));
+            Config::save(['microweber']);
             Auth::login($adminUser);
         }
     }
